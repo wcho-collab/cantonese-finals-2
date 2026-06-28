@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粵音點字學習遊戲 - 入聲韻母練習</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --text-color-primary: #FFFFFF;
+            --text-color-active: #FFFF00;
+            --dot-inactive-color: #333333;
+            --dot-active-color: #FFFF00;
+            --dot-border-color: #FFFFFF;
+            --dot-active-shadow: 0 0 20px var(--dot-active-color);
+            --panel-bg: #222222;
+            --cell-width: 180px;
+            --text-size-large: clamp(50px, 12vmin, 90px);
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color-primary);
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            height: 100dvh; 
+            overflow: hidden; 
+            touch-action: manipulation; 
+            cursor: pointer;
+        }
+
+        /* 第一頁：心光 Logo 歡迎畫面 */
+        #welcome-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 201;
+            color: var(--text-color-primary);
+            cursor: pointer;
+        }
+
+        /* 第二頁：啟動教學畫面 */
+        #start-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: var(--bg-color); display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 200;
+            color: var(--text-color-primary); cursor: pointer;
+        }
+
+        /* Logo 容器 */
+        #logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #school-logo {
+            width: clamp(200px, 45vw, 400px);
+            height: auto;
+            background-color: white; /* Logo 背景白色較清晰 */
+            padding: 10px;
+            border-radius: 12px;
+        }
+        #braille-group-text {
+            font-size: clamp(20px, 4.5vmin, 30px);
+            color: #FFFFFF;
+            margin-top: 15px;
+            font-weight: bold;
+            letter-spacing: 2px;
+        }
+
+        #start-overlay h1 { font-size: clamp(30px, 8vmin, 60px); margin-bottom: 20px;}
+        #start-overlay p { font-size: clamp(20px, 5vmin, 40px); color: var(--text-color-active); font-weight: bold; text-align: center; padding: 0 20px; line-height: 1.5;}
+        .hint-text { font-size: clamp(16px, 4vmin, 24px); color: #AAAAAA; font-weight: normal; margin-top: 10px; display: block;}
+
+        /* 右上角按鈕群組 */
+        #top-right-controls {
+            position: absolute; top: 2vh; right: 4vw; display: flex; gap: 15px; z-index: 102;
+        }
+        .icon-btn {
+            font-size: clamp(25px, 6vmin, 40px); background: none; border: none;
+            cursor: pointer; color: var(--text-color-primary); padding: 5px; transition: transform 0.2s;
+        }
+        .icon-btn:active { transform: scale(0.9); }
+
+        /* 左上角控制區域 */
+        #top-left-controls {
+            position: absolute; top: 2vh; left: 4vw; display: flex; flex-direction: column;
+            gap: 12px; align-items: flex-start; z-index: 102; cursor: default;
+        }
+        .selector-container { display: flex; align-items: center; gap: 8px; }
+        .selector-label { font-size: clamp(14px, 3.5vmin, 18px); font-weight: bold; color: var(--text-color-primary); }
+        #question-selector {
+            font-size: clamp(14px, 3.5vmin, 18px); padding: 8px 12px; background-color: #222;
+            color: white; border: 1px solid white; border-radius: 8px; cursor: pointer; outline: none; max-width: 150px;
+        }
+        #audio-prompt-btn {
+            font-size: clamp(14px, 3.5vmin, 18px); padding: 8px 15px; background-color: #333; color: white;
+            border: 1px solid white; border-radius: 8px; cursor: pointer; touch-action: manipulation; box-shadow: 0 0 10px rgba(0,0,0,0.5);
+        }
+
+        #game-container {
+            text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 2.5vh; width: 100%; max-width: 600px; padding: 0 10px; box-sizing: border-box; display: none; cursor: default;
+        }
+
+        #question-title { font-size: clamp(22px, 5.5vmin, 35px); color: var(--text-color-active); font-weight: bold; margin-bottom: -1vh; pointer-events: none;}
+        #instruction { font-size: var(--text-size-large); font-weight: bold; line-height: 1; margin: 0; pointer-events: none; }
+        #braille-wrapper { position: relative; display: inline-block; cursor: default; }
+
+        #reward-icon {
+            position: absolute; top: 50%; transform: translateY(-50%) scale(0); font-size: clamp(100px, 25vmin, 180px); 
+            opacity: 0; pointer-events: none; z-index: 10; filter: drop-shadow(0 0 20px rgba(255,255,255,0.8));
+        }
+        #reward-icon.show-reward { animation: popIn 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; }
+        @keyframes popIn { 0% { transform: translateY(-50%) scale(0) rotate(-15deg); opacity: 0; } 50% { transform: translateY(-50%) scale(1.3) rotate(10deg); opacity: 1; } 100% { transform: translateY(-50%) scale(1) rotate(0deg); opacity: 1; } }
+
+        .braille-cell {
+            display: grid; grid-template-columns: repeat(2, auto); gap: calc(var(--cell-width) * 0.06) calc(var(--cell-width) * 0.12);
+            padding: calc(var(--cell-width) * 0.08); border: calc(var(--cell-width) * 0.016) solid var(--dot-border-color);
+            border-radius: calc(var(--cell-width) * 0.08); width: var(--cell-width); justify-content: center;
+            box-sizing: border-box; background-color: var(--bg-color); margin: 0 auto;
+        }
+
+        .dot {
+            width: calc(var(--cell-width) * 0.25); height: calc(var(--cell-width) * 0.25); background-color: var(--dot-inactive-color);
+            border: calc(var(--cell-width) * 0.012) solid var(--dot-border-color); border-radius: 50%;
+            cursor: pointer; position: relative; display: flex; align-items: center; justify-content: center; 
+            touch-action: manipulation; transition: opacity 0.2s;
+        }
+        .dot.active { background-color: var(--dot-active-color); box-shadow: var(--dot-active-shadow); }
+        .dot::after { content: attr(data-key-hint); color: #000; font-size: calc(var(--cell-width) * 0.1); font-weight: bold; display: var(--display-hint, none); }
+
+        .dot[data-dot-num="1"] { --cue-color: #FF69B4; } .dot[data-dot-num="2"] { --cue-color: #FFA500; } 
+        .dot[data-dot-num="3"] { --cue-color: #32CD32; } .dot[data-dot-num="4"] { --cue-color: #FFFF00; } 
+        .dot[data-dot-num="5"] { --cue-color: #1E90FF; } .dot[data-dot-num="6"] { --cue-color: #BA55D3; } 
+        body[data-dot-style="solid-color"] .dot { background-color: var(--cue-color); border: calc(var(--cell-width) * 0.012) solid var(--cue-color); }
+        body[data-dot-style="solid-color"] .dot.active { background-color: #FF0000; border-color: #FF0000; box-shadow: 0 0 20px #FF0000; }
+
+        #feedback-text { font-size: clamp(24px, 6vmin, 45px); height: clamp(35px, 8vmin, 55px); font-weight: bold; display: flex; align-items: center; justify-content: center; margin: 0; pointer-events: none;}
+        .correct { color: var(--text-color-active); }
+        #submit-btn { font-size: clamp(20px, 4vmin, 30px); padding: 2vh 8vw; background-color: var(--dot-active-color); color: #000; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; touch-action: manipulation; }
+
+        /* 面板與遮罩 */
+        #overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; cursor: default;}
+        .panel {
+            display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel-bg);
+            padding: 4vh 5vw; border-radius: 20px; border: 4px solid white; z-index: 101; width: 90%; max-width: 450px;
+            max-height: 85vh; overflow-y: auto; box-sizing: border-box; cursor: default;
+        }
+        .panel h2 { text-align: center; color: white; font-size: clamp(22px, 5vmin, 30px); margin-top: 0; }
+        .panel-close-hint { text-align:center; color:#ccc; font-size: clamp(14px, 3vmin, 18px); margin-bottom: 0; margin-top: 20px; }
+
+        /* 設定面板專用 */
+        .setting-item { margin-bottom: 3vh; }
+        .setting-item label { display: block; font-size: clamp(16px, 3.5vmin, 22px); margin-bottom: 1.5vh; color: white; }
+        .setting-item select { width: 100%; height: clamp(35px, 6vmin, 45px); font-size: clamp(16px, 3vmin, 20px); }
+        input[type="range"] { width: 100%; height: 10px; cursor: pointer; background: #555; border-radius: 5px; outline: none; appearance: none; -webkit-appearance: none; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 25px; height: 25px; border-radius: 50%; background: var(--text-color-active); cursor: pointer; }
+
+        /* 成績面板專用 */
+        .stats-table-container { max-height: 50vh; overflow-y: auto; margin-bottom: 15px; border: 1px solid #555; background: #111; }
+        .stats-table { width: 100%; border-collapse: collapse; color: white; font-size: clamp(14px, 3.5vmin, 18px); }
+        .stats-table th, .stats-table td { border: 1px solid #444; padding: 10px 5px; text-align: center; }
+        .stats-table th { background-color: #333; position: sticky; top: 0; z-index: 2; }
+        .stats-table tr:nth-child(even) { background-color: #1a1a1a; }
+        .clear-btn { width: 100%; padding: 12px; background-color: #d9534f; color: white; border: none; border-radius: 8px; font-size: clamp(16px, 4vmin, 20px); cursor: pointer; font-weight: bold; }
+    </style>
+</head>
+<body data-dot-style="solid-color">
+
+    <div id="welcome-overlay" onclick="clearWelcome()">
+        <div id="logo-container">
+            <img id="school-logo" src="https://ebenezer.edu.hk/sites/default/files/logo.png" alt="心光盲人院暨學校">
+            <div id="braille-group-text">(點字組)</div>
+        </div>
+    </div>
+
+    <div id="start-overlay" onclick="startGame()">
+        <h1>入聲韻母教學</h1>
+        <p>按 Space (空白鍵) 或點擊螢幕開始<br><span class="hint-text">💡 遊戲中可隨時按 Enter 重聽題目</span></p>
+    </div>
+
+    <div id="top-left-controls" style="display: none;">
+        <div class="selector-container">
+            <span class="selector-label">選擇題目：</span>
+            <select id="question-selector" onchange="jumpToQuestion(this.value)" aria-label="選擇題目"></select>
+        </div>
+        <button id="audio-prompt-btn" onclick="playPrompt()" aria-label="聽讀音">🔊 聽讀音 (Enter)</button>
+    </div>
+
+    <div id="top-right-controls">
+        <button class="icon-btn" onclick="toggleStats()" aria-label="成績表">📊</button>
+        <button class="icon-btn" onclick="toggleSettings()" aria-label="設定">⚙️</button>
+    </div>
+
+    <div id="game-container">
+        <div id="question-title" aria-live="polite"></div>
+        <div id="instruction"></div>
+        <div id="braille-wrapper">
+            <div id="reward-icon"></div>
+            <div class="braille-cell" id="braille-cell">
+                <div class="dot" data-dot-num="1" data-key-hint="1" onclick="toggleDot(this)"></div>
+                <div class="dot" data-dot-num="4" data-key-hint="4" onclick="toggleDot(this)"></div>
+                <div class="dot" data-dot-num="2" data-key-hint="2" onclick="toggleDot(this)"></div>
+                <div class="dot" data-dot-num="5" data-key-hint="5" onclick="toggleDot(this)"></div>
+                <div class="dot" data-dot-num="3" data-key-hint="3" onclick="toggleDot(this)"></div>
+                <div class="dot" data-dot-num="6" data-key-hint="6" onclick="toggleDot(this)"></div>
+            </div>
+        </div>
+        <button id="submit-btn" onclick="this.blur(); handleButtonClick()">提交 (點擊空白處)</button>
+        <div id="feedback-text" aria-live="assertive"></div>
+    </div>
+
+    <div id="overlay" onclick="closeAllPanels()"></div>
+
+    <div id="settings-panel" class="panel">
+        <h2>遊戲設定</h2>
+        
+        <div class="setting-item">
+            <label>出題順序：</label>
+            <select id="question-order" onchange="changeQuestionOrder(this.value)">
+                <option value="sequential" selected>順序出題</option>
+                <option value="random">隨機出題</option>
+            </select>
+        </div>
+
+        <div class="setting-item">
+            <label>點字樣式：</label>
+            <select id="dot-style-select" onchange="changeDotStyle(this.value)">
+                <option value="solid-color" selected>實心顏色 (預設)</option>
+                <option value="default">預設框線</option>
+            </select>
+        </div>
+        
+        <div class="setting-item">
+            <label>過關獎賞聲音：</label>
+            <select id="reward-sound">
+                <option value="english" selected>英文讚賞 (Perfect/Awesome...)</option>
+                <option value="cantonese">中文/粵語讚賞 (好叻呀/做得好...)</option>
+                <option value="mtr">地鐵嘟嘟嘟嘟聲</option>
+            </select>
+        </div>
+        
+        <div class="setting-item">
+            <label>對比度：</label>
+            <select id="color-scheme" onchange="changeColor(this.value)">
+                <option value="black-yellow">黑底黃點</option>
+                <option value="white-black">白底黑字</option>
+            </select>
+        </div>
+        <div class="setting-item">
+            <label>點字格大小： <span id="size-display" style="color:var(--text-color-active);">180px</span></label>
+            <input type="range" id="size-slider" min="80" max="180" value="180" step="5" oninput="changeSize(this.value)">
+        </div>
+        <div class="setting-item">
+            <label>顯示按鍵提示 (1,2,3,4,5,6)：</label>
+            <select onchange="toggleHints(this.value)">
+                <option value="none">隱藏</option>
+                <option value="block">顯示</option>
+            </select>
+        </div>
+        <p class="panel-close-hint">點擊空白處返回遊戲</p>
+    </div>
+
+    <div id="stats-panel" class="panel">
+        <h2>學習紀錄表</h2>
+        <div class="stats-table-container">
+            <table class="stats-table">
+                <thead><tr><th>題目</th><th>嘗試次數</th><th>準確度</th></tr></thead>
+                <tbody id="stats-tbody">
+                    </tbody>
+            </table>
+        </div>
+        <button class="clear-btn" onclick="clearStats()">清除所有紀錄</button>
+        <p class="panel-close-hint">點擊空白處返回遊戲</p>
+    </div>
+
+    <script>
+    const questions = [
+        { symbol: '/ aap /', name: '鴨', speechTitle: '打出入聲韻母 鴨', expected: [1, 2, 3, 4] }, 
+        { symbol: '/ aat /', name: '壓', speechTitle: '打出入聲韻母 壓', expected: [2, 3, 4, 5] }, 
+        { symbol: '/ aak /', name: '厄', speechTitle: '打出入聲韻母 厄', expected: [1, 3] },          
+        { symbol: '/ ap /', name: 'ap', speechTitle: '打出入聲韻母', expected: [2, 6], promptAudio: 'ap.m4a' },
+        { symbol: '/ at /', name: 'at', speechTitle: '打出入聲韻母', expected: [3, 5], promptAudio: 'at.m4a' },          
+        { symbol: '/ ak /', name: 'ak', speechTitle: '打出入聲韻母', expected: [4, 6], promptAudio: 'ak.m4a' },          
+        { symbol: '/ ip /', name: '葉', speechTitle: '打出入聲韻母 葉', expected: [1, 2, 3, 4, 6] }, 
+        { symbol: '/ it /', name: '熱', speechTitle: '打出入聲韻母 熱', expected: [2, 3, 4, 5, 6] }, 
+        { symbol: '/ ik /', name: 'ik', speechTitle: '打出入聲韻母', expected: [1, 2, 3, 5], promptAudio: 'ik.m4a' },    
+        { symbol: '/ ot /', name: 'ot', speechTitle: '打出入聲韻母', expected: [1, 2, 4], promptAudio: 'ot.m4a' },       
+        { symbol: '/ ok /', name: 'ok', speechTitle: '打出入聲韻母', expected: [1, 2, 4, 5, 6], promptAudio: 'ok.m4a' }, 
+        { symbol: '/ ek /', name: 'ek', speechTitle: '打出入聲韻母', expected: [2, 4, 5, 6], promptAudio: 'ek.m4a' },    
+        { symbol: '/ ut /', name: '活', speechTitle: '打出入聲韻母 活', expected: [1, 3, 5, 6] },    
+        { symbol: '/ uk /', name: '屋', speechTitle: '打出入聲韻母 屋', expected: [1, 2, 3, 4, 5] }, 
+        { symbol: '/ oet /', name: 'oet', speechTitle: '打出入聲韻母', expected: [1, 3, 4, 6], promptAudio: 'oet.m4a' },  
+        { symbol: '/ oek /', name: 'oek', speechTitle: '打出入聲韻母', expected: [2, 4, 6], promptAudio: 'oek.m4a' },     
+        { symbol: '/ yut /', name: '月', speechTitle: '打出入聲韻母 月', expected: [1, 2, 3, 5, 6] }
+    ];
+    
+    const selector = document.getElementById('question-selector');
+    questions.forEach((q, index) => {
+        const opt = document.createElement('option'); opt.value = index; opt.textContent = `第 ${index + 1} 題: ${q.name}`; selector.appendChild(opt);
+    });
+    
+    let gameStarted = false;
+    let welcomeCleared = false; // 新增：追蹤第一頁是否已關閉
+    let currentQuestionIndex = 0;
+    let currentQuestion = questions[currentQuestionIndex];
+    let current = [];
+    let isSettingsOpen = false;
+    let isStatsOpen = false;
+    let resetOnNextInput = false;
+    let isNextMode = false;
+    let currentWrongAttempts = 0;
+    let questionOrder = 'sequential';
+    
+    const customAudioPlayer = new Audio();
+    // 更新：加入中英文各自的讚賞詞彙庫
+    const praisesEn = ["Perfect!", "Excellent!", "Well done!", "Fantastic!", "Great job!"];
+    const praisesZh = ["好叻呀！", "做得好！", "真係聰明！", "非常準確！"];
+    const rewardEmojis = ["👍", "😁", "🥁", "🎉", "🌟", "🚀", "🏆"];
+    const keyMap = { 'f':1, 'd':2, 's':3, 'j':4, 'k':5, 'l':6 };
+    let fallbackTimer = null;
+    
+    function speak(text, lang = 'zh-HK', vol = 0.25, onEndCallback = null) {
+        window.speechSynthesis.cancel();
+        clearTimeout(fallbackTimer);
+        const utterance = new SpeechSynthesisUtterance(text); utterance.lang = lang; utterance.rate = 0.9; utterance.volume = vol;
+        if (onEndCallback) {
+            let callbackFired = false;
+            utterance.onend = () => { if (!callbackFired) { callbackFired = true; clearTimeout(fallbackTimer); onEndCallback(); } };
+            fallbackTimer = setTimeout(() => { if (!callbackFired) { callbackFired = true; onEndCallback(); } }, 3500);
+        }
+        window.speechSynthesis.speak(utterance);
+    }
+    
+    function playMTRSound() {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        for (let i = 0; i < 5; i++) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine'; osc.frequency.value = 1100; osc.connect(gain); gain.connect(ctx.destination);
+            const startTime = ctx.currentTime + i * 0.3;
+            osc.start(startTime);
+            gain.gain.setValueAtTime(0, startTime); gain.gain.linearRampToValueAtTime(0.1, startTime + 0.02);
+            gain.gain.setValueAtTime(0.1, startTime + 0.15); gain.gain.linearRampToValueAtTime(0, startTime + 0.18);
+            osc.stop(startTime + 0.2);
+        }
+    }
+
+    function playPrompt() {
+        window.speechSynthesis.cancel(); customAudioPlayer.pause();
+        if (currentQuestion.promptAudio) {
+            speak(currentQuestion.speechTitle, 'zh-HK', 0.25, () => {
+                customAudioPlayer.src = currentQuestion.promptAudio; customAudioPlayer.currentTime = 0; customAudioPlayer.play().catch(()=>{});
+            });
+        } else { speak(currentQuestion.speechTitle, 'zh-HK', 0.25); }
+    }
+
+    // 關閉第一頁
+    function clearWelcome() {
+        welcomeCleared = true;
+        const welcome = document.getElementById('welcome-overlay');
+        if (welcome) welcome.style.display = 'none';
+    }
+
+    function startGame() {
+        if (gameStarted) return;
+        if (!welcomeCleared) { clearWelcome(); return; } // 防止越過第一頁
+        gameStarted = true;
+        document.getElementById('start-overlay').style.display = 'none'; document.getElementById('game-container').style.display = 'flex'; document.getElementById('top-left-controls').style.display = 'flex';
+        customAudioPlayer.src = "data:audio/mp3;base64,//NExAAAAANIAAAAAExBTUUzLjEwMKqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"; 
+        customAudioPlayer.play().catch(()=>{}); loadQuestion();
+    }
+
+    function loadQuestion() {
+        currentQuestion = questions[currentQuestionIndex];
+        const displayTitle = currentQuestion.promptAudio ? currentQuestion.name : currentQuestion.speechTitle;
+        document.getElementById('question-title').textContent = `第 ${currentQuestionIndex + 1} 題： ${displayTitle}`;
+        document.getElementById('instruction').textContent = currentQuestion.symbol;
+        document.getElementById('question-selector').value = currentQuestionIndex;
+        clearBoard(); resetOnNextInput = false; isNextMode = false;
+        currentWrongAttempts = 0;
+
+        document.getElementById('submit-btn').textContent = "提交 (點擊空白處)";
+        document.getElementById('reward-icon').classList.remove('show-reward');
+        setTimeout(playPrompt, 300);
+    }
+
+    function jumpToQuestion(index) { currentQuestionIndex = parseInt(index); loadQuestion(); document.getElementById('question-selector').blur(); }
+    
+    function nextQuestion() { 
+        if (questionOrder === 'random') {
+            let nextIdx = currentQuestionIndex;
+            if (questions.length > 1) {
+                while (nextIdx === currentQuestionIndex) {
+                    nextIdx = Math.floor(Math.random() * questions.length);
+                }
+            }
+            currentQuestionIndex = nextIdx;
+        } else {
+            currentQuestionIndex = (currentQuestionIndex + 1) % questions.length;
+        }
+        loadQuestion(); 
+    }
+
+    function clearBoard() {
+        current = [];
+        document.querySelectorAll('.dot').forEach(dot => {
+            dot.classList.remove('active'); dot.style.opacity = '1'; dot.style.backgroundColor = ''; dot.style.borderColor = ''; dot.style.boxShadow = '';
+        });
+        document.getElementById('feedback-text').textContent = "";
+    }
+
+    function toggleDot(el) {
+        if (resetOnNextInput) { clearBoard();
+            resetOnNextInput = false; if (isNextMode) { isNextMode = false; document.getElementById('submit-btn').textContent = "提交 (點擊空白處)"; document.getElementById('reward-icon').classList.remove('show-reward');
+        } }
+        const num = parseInt(el.getAttribute('data-dot-num'));
+        if (el.classList.contains('active')) { el.classList.remove('active');
+            current = current.filter(n => n !== num); } else { el.classList.add('active'); current.push(num);
+        }
+        document.getElementById('feedback-text').textContent = "";
+    }
+
+    function displayCorrectAnswer() {
+        const expected = currentQuestion.expected;
+        document.querySelectorAll('.dot').forEach(dot => {
+            const num = parseInt(dot.getAttribute('data-dot-num'));
+            if (expected.includes(num)) { dot.style.backgroundColor = '#FF0000'; dot.style.borderColor = '#FF0000'; dot.style.boxShadow = '0 0 25px #FF0000'; dot.style.opacity = '1'; } else { dot.style.opacity = '0'; }
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (isSettingsOpen || isStatsOpen) return;
+        const k = e.key.toLowerCase();
+        if (k === ' ' || e.code === 'Space') {
+            if (document.activeElement === document.getElementById('question-selector')) return; e.preventDefault(); 
+            if (!welcomeCleared) clearWelcome();
+            else if (!gameStarted) startGame(); 
+            else handleButtonClick(); 
+            return;
+        }
+        if (e.key === 'Enter') { e.preventDefault(); if (gameStarted) playPrompt(); return; }
+        if (keyMap[k]) { const el = document.querySelector(`.dot[data-dot-num="${keyMap[k]}"]`); toggleDot(el); }
+    });
+    
+    document.addEventListener('click', function(e) {
+        if (!gameStarted || isSettingsOpen || isStatsOpen) return;
+        const clickedCell = e.target.closest('.braille-cell'); const clickedBtn = e.target.closest('button'); const clickedSelect = e.target.closest('select');
+        if (!clickedCell && !clickedBtn && !clickedSelect) handleButtonClick();
+    });
+    
+    function handleButtonClick() { if (!gameStarted) return; if (isNextMode) nextQuestion(); else checkAnswer(); }
+
+    function showRewardIcon() {
+        const rewardEl = document.getElementById('reward-icon');
+        rewardEl.textContent = rewardEmojis[Math.floor(Math.random() * rewardEmojis.length)];
+        const isLeft = Math.random() > 0.5; if (isLeft) { rewardEl.style.right = 'calc(100% + 80px)';
+            rewardEl.style.left = 'auto'; } else { rewardEl.style.left = 'calc(100% + 80px)'; rewardEl.style.right = 'auto';
+        }
+        rewardEl.classList.remove('show-reward'); void rewardEl.offsetWidth; rewardEl.classList.add('show-reward');
+    }
+
+    function saveRecord() {
+        const totalAttempts = currentWrongAttempts + 1;
+        const accuracyNum = Math.round((1 / totalAttempts) * 100);
+        let colorCode = accuracyNum === 100 ? '#4CAF50' : (accuracyNum >= 50 ? '#FFC107' : '#F44336');
+        
+        const record = {
+            qName: currentQuestion.name,
+            attempts: totalAttempts,
+            accuracyStr: `<span style="color:${colorCode}">${accuracyNum}%</span>`
+        };
+        let stats = JSON.parse(localStorage.getItem('brailleGameStats') || '[]');
+        stats.unshift(record);
+        if (stats.length > 50) stats.pop();
+        localStorage.setItem('brailleGameStats', JSON.stringify(stats));
+    }
+
+    function renderStats() {
+        const tbody = document.getElementById('stats-tbody');
+        let stats = JSON.parse(localStorage.getItem('brailleGameStats') || '[]');
+        tbody.innerHTML = '';
+        if (stats.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="color:#aaa;">目前還沒有紀錄喔！</td></tr>';
+            return;
+        }
+        stats.forEach(r => {
+            let tr = document.createElement('tr');
+            tr.innerHTML = `<td>${r.qName}</td><td>${r.attempts} 次</td><td>${r.accuracyStr}</td>`;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function clearStats() {
+        if(confirm("確定要清除所有學習紀錄嗎？")) {
+            localStorage.removeItem('brailleGameStats');
+            renderStats();
+        }
+    }
+
+    function checkAnswer() {
+        if (current.length === 0) return;
+        window.speechSynthesis.cancel(); clearTimeout(fallbackTimer); customAudioPlayer.pause(); customAudioPlayer.onended = null; 
+
+        const feedback = document.getElementById('feedback-text');
+        const sortedCurrent = [...current].sort((a,b) => a-b);
+        const sortedTarget = [...currentQuestion.expected].sort((a,b) => a-b);
+        const isCorrect = JSON.stringify(sortedCurrent) === JSON.stringify(sortedTarget);
+        
+        if (isCorrect) {
+            displayCorrectAnswer();
+            saveRecord();
+
+            // 更新：根據設定決定過關發出的語音/聲音
+            let feedbackMsg = "";
+            const soundSetting = document.getElementById('reward-sound').value;
+            
+            if (soundSetting === 'cantonese') {
+                feedbackMsg = praisesZh[Math.floor(Math.random() * praisesZh.length)];
+                speak(feedbackMsg, 'zh-HK', 0.6);
+            } else if (soundSetting === 'english') {
+                feedbackMsg = praisesEn[Math.floor(Math.random() * praisesEn.length)];
+                speak(feedbackMsg, 'en-US', 0.6);
+            } else if (soundSetting === 'mtr') {
+                feedbackMsg = "過關！";
+                playMTRSound();
+            }
+
+            feedback.textContent = feedbackMsg; 
+            feedback.className = "correct";
+            
+            showRewardIcon();
+            
+            resetOnNextInput = true; isNextMode = true; document.getElementById('submit-btn').textContent = "下一題 (點擊空白處)";
+        } else {
+            currentWrongAttempts++;
+            clearBoard();
+
+            feedback.textContent = "再試試看"; feedback.className = "";
+            const expectedDots = sortedTarget.join(', ');
+            if (currentQuestion.promptAudio) {
+                speak("差一點點，再試試，", 'zh-HK', 0.25, () => {
+                    customAudioPlayer.src = currentQuestion.promptAudio;
+                    customAudioPlayer.onended = () => { speak(`是 ${expectedDots} 點。`, 'zh-HK', 0.25); };
+                    customAudioPlayer.play().catch(()=>{});
+                });
+            } else { speak(`差一點點，再試試，${currentQuestion.name} 是 ${expectedDots} 點。`, 'zh-HK', 0.25); }
+            resetOnNextInput = false;
+        }
+    }
+
+    function closeAllPanels() {
+        isSettingsOpen = false;
+        isStatsOpen = false;
+        document.getElementById('settings-panel').style.display = 'none';
+        document.getElementById('stats-panel').style.display = 'none';
+        document.getElementById('overlay').style.display = 'none';
+    }
+
+    function toggleSettings() {
+        isSettingsOpen = !isSettingsOpen; isStatsOpen = false;
+        document.getElementById('settings-panel').style.display = isSettingsOpen ? 'block' : 'none';
+        document.getElementById('stats-panel').style.display = 'none';
+        document.getElementById('overlay').style.display = isSettingsOpen ? 'block' : 'none';
+    }
+
+    function toggleStats() {
+        isStatsOpen = !isStatsOpen; isSettingsOpen = false;
+        if (isStatsOpen) renderStats(); 
+        document.getElementById('stats-panel').style.display = isStatsOpen ? 'block' : 'none';
+        document.getElementById('settings-panel').style.display = 'none';
+        document.getElementById('overlay').style.display = isStatsOpen ? 'block' : 'none';
+    }
+
+    function changeDotStyle(style) { document.body.setAttribute('data-dot-style', style); }
+
+    function changeColor(v) {
+        const r = document.documentElement;
+        if (v === 'white-black') {
+            r.style.setProperty('--bg-color', '#FFFFFF'); r.style.setProperty('--text-color-primary', '#000000');
+            r.style.setProperty('--text-color-active', '#000000'); r.style.setProperty('--dot-inactive-color', '#FFFFFF'); 
+            r.style.setProperty('--dot-active-color', '#000000'); r.style.setProperty('--dot-border-color', '#000000'); r.style.setProperty('--dot-active-shadow', 'none'); 
+            document.getElementById('submit-btn').style.color = "#FFFFFF"; document.getElementById('start-overlay').style.backgroundColor = "#FFFFFF"; document.getElementById('start-overlay').style.color = "#000000";
+            const wel = document.getElementById('welcome-overlay'); if(wel) { wel.style.backgroundColor = "#FFFFFF"; wel.style.color = "#000000"; }
+            document.querySelectorAll('.icon-btn').forEach(btn => btn.style.color = "#000000"); 
+        } else {
+            r.style.setProperty('--bg-color', '#000000');
+            r.style.setProperty('--text-color-primary', '#FFFFFF');
+            r.style.setProperty('--text-color-active', '#FFFF00'); r.style.setProperty('--dot-inactive-color', '#333333');
+            r.style.setProperty('--dot-active-color', '#FFFF00'); r.style.setProperty('--dot-border-color', '#FFFFFF'); r.style.setProperty('--dot-active-shadow', '0 0 20px var(--dot-active-color)');
+            document.getElementById('submit-btn').style.color = "#000000";
+            document.getElementById('start-overlay').style.backgroundColor = "#000000"; document.getElementById('start-overlay').style.color = "#FFFFFF";
+            const wel = document.getElementById('welcome-overlay'); if(wel) { wel.style.backgroundColor = "#000000"; wel.style.color = "#FFFFFF"; }
+            document.querySelectorAll('.icon-btn').forEach(btn => btn.style.color = "#FFFFFF");
+        }
+    }
+
+    function changeSize(v) { document.getElementById('size-display').textContent = v + 'px'; document.documentElement.style.setProperty('--cell-width', v + 'px'); }
+    
+    function toggleHints(v) { document.documentElement.style.setProperty('--display-hint', v); }
+
+    function changeQuestionOrder(v) { questionOrder = v; }
+    </script>
+</body>
+</html>
